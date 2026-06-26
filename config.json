@@ -1,0 +1,31 @@
+{
+  "lookback_days": 7,
+  "sources": {
+    "cisa_kev": { "enabled": true },
+    "nvd": { "enabled": true, "results_per_page": 200, "max_pages": 5 },
+    "epss": { "enabled": true, "batch_size": 100 },
+    "github_advisories": { "enabled": true, "per_page": 100, "max_pages": 3 },
+    "news_rss": {
+      "enabled": true,
+      "feeds": [
+        "https://www.bleepingcomputer.com/feed/",
+        "https://feeds.feedburner.com/TheHackersNews",
+        "https://krebsonsecurity.com/feed/",
+        "https://www.cisa.gov/cybersecurity-advisories/all.xml"
+      ]
+    },
+    "threatfox": {
+      "enabled": false,
+      "days": 1,
+      "note": "abuse.ch requires a free Auth-Key. Set THREATFOX_AUTH_KEY and flip enabled to true."
+    }
+  },
+  "scoring": {
+    "weights": { "cvss": 0.4, "epss": 0.4, "kev": 0.2 },
+    "kev_floor": 80
+  },
+  "output": {
+    "dashboard_path": "dashboard.html",
+    "top_n": 50
+  }
+}

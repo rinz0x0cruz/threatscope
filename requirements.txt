@@ -1,0 +1,5 @@
+# ThreatScope runs on the Python 3.9+ standard library only.
+# There are NO required third-party packages.
+#
+# Optional integrations are enabled via config.json + environment variables
+# (NVD_API_KEY, GITHUB_TOKEN, THREATFOX_AUTH_KEY) and still use only stdlib HTTP.
