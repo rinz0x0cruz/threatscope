@@ -16,9 +16,11 @@ feeds, and has **no third-party dependencies** — just Python 3.9+.
 ## Features
 
 - **Multi-source ingestion** — CISA KEV, NVD (new/updated CVEs), EPSS exploitation probabilities,
-  GitHub Security Advisories, and security-news RSS (BleepingComputer, The Hacker News, Krebs, CISA).
-- **Exploitability-aware prioritization** — transparent, weighted scoring (CVSS + EPSS + KEV) with a
-  KEV floor, producing a 0–100 score and a Critical/High/Medium/Low tier with a human-readable rationale.
+  GitHub Security Advisories, public exploit/PoC availability (poc-in-github), and security-news RSS
+  (BleepingComputer, The Hacker News, Krebs, CISA).
+- **Exploitability-aware prioritization** — transparent, weighted scoring (CVSS + EPSS + KEV + public-PoC
+  availability) with a KEV floor, producing a 0–100 score and a Critical/High/Medium/Low tier with a
+  human-readable rationale.
 - **Local SQLite store** — dedupe plus first-seen / last-seen tracking across runs.
 - **Self-contained dashboard** — one `dashboard.html` with inline CSS/JS, sortable/filterable,
   works offline, no CDN or network needed to view.
@@ -35,6 +37,7 @@ flowchart LR
         NVD[NVD CVEs]
         EPSS[FIRST EPSS]
         GHSA[GitHub Advisories]
+        POC[Exploit PoCs<br/>poc-in-github]
         RSS[Security News RSS]
     end
     Sources --> F[feeds.py: fetch + normalize]
@@ -100,15 +103,17 @@ Optional environment variables raise limits or enable extra feeds:
 ## Scoring model
 
 ```
-score = 100 * ( w_cvss * (CVSS / 10) + w_epss * EPSS + w_kev * KEV )
+score = 100 * ( w_cvss * (CVSS / 10) + w_epss * EPSS + w_kev * KEV + w_poc * PoC )
 ```
 
 - `CVSS` — NVD CVSS v3.1 base score (0–10).
 - `EPSS` — FIRST EPSS exploitation probability for the next 30 days (0–1).
 - `KEV` — 1 if the CVE is in the CISA Known Exploited Vulnerabilities catalog, else 0.
+- `PoC` — 1 if a public proof-of-concept / exploit exists on GitHub (via poc-in-github), else 0.
 - A KEV hit also forces a configurable **floor** (default 80) — anything known-exploited is at least High/Critical.
 
-Default weights: CVSS 0.4, EPSS 0.4, KEV 0.2 (all configurable in `config.json`).
+Default weights: CVSS 0.35, EPSS 0.35, KEV 0.2, PoC 0.1 (all configurable in `config.json`).
+Public-PoC lookups run for the top-N prioritized CVEs each cycle (configurable via `poc_github.top_n_enrich`).
 
 ## Skills demonstrated
 
@@ -127,6 +132,10 @@ report/dashboard generation · automation & scheduling.
 ## License
 
 MIT © 2026 Mohit Sharma — see [LICENSE](LICENSE).
+
+## Credits & data sources
+
+CISA KEV · NVD · FIRST EPSS · GitHub Security Advisories · [poc-in-github](https://poc-in-github.motikan2010.net/) (public PoC index) · security-news RSS.
 
 ## Disclaimer
 

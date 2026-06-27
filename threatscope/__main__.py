@@ -32,8 +32,9 @@ DEFAULT_CONFIG = {
             ],
         },
         "threatfox": {"enabled": False, "days": 1},
+        "poc_github": {"enabled": True, "top_n_enrich": 50, "delay": 0.4},
     },
-    "scoring": {"weights": {"cvss": 0.4, "epss": 0.4, "kev": 0.2}, "kev_floor": 80},
+    "scoring": {"weights": {"cvss": 0.35, "epss": 0.35, "kev": 0.2, "poc": 0.1}, "kev_floor": 80},
     "output": {"dashboard_path": "dashboard.html", "top_n": 50},
 }
 
@@ -120,6 +121,23 @@ def cmd_update(cfg, store):
             r["kev_date_added"] = kev[cid].get("date_added")
         r["epss"] = epss.get(cid)
     prioritize.enrich_and_sort(cves, cfg["scoring"]["weights"], cfg["scoring"]["kev_floor"])
+
+    pg = src.get("poc_github", {})
+    if pg.get("enabled") and cves:
+        top = cves[:pg.get("top_n_enrich", 50)]
+        try:
+            pocs = feeds.fetch_pocs([r["cve_id"] for r in top], pg.get("delay", 0.4))
+            for r in cves:
+                info = pocs.get(r["cve_id"])
+                if info:
+                    r["has_poc"], r["poc_count"], r["poc_url"] = True, info["count"], info["url"]
+            store.log_run("poc_github", len(pocs), "ok")
+            print("  [POC]  %d of top %d CVEs have public exploits" % (len(pocs), len(top)))
+        except Exception as e:
+            store.log_run("poc_github", 0, "error")
+            print("  [POC]  error: %s" % e)
+        prioritize.enrich_and_sort(cves, cfg["scoring"]["weights"], cfg["scoring"]["kev_floor"])
+
     for r in cves:
         store.upsert_cve(r)
 
@@ -148,8 +166,8 @@ def cmd_update(cfg, store):
 
     store.commit()
     s = store.stats()
-    print("\n  Stored: %d CVEs (%d KEV, %d Critical) | %d news | %d IOCs"
-          % (s["total_cves"], s["kev"], s["critical"], s["news"], s["iocs"]))
+    print("\n  Stored: %d CVEs (%d KEV, %d PoC, %d Critical) | %d news | %d IOCs"
+          % (s["total_cves"], s["kev"], s["with_poc"], s["critical"], s["news"], s["iocs"]))
 
 
 def cmd_report(store, top):
@@ -159,9 +177,14 @@ def cmd_report(store, top):
         print("  (no data yet - run 'python -m threatscope update' first)\n")
         return
     for r in rows:
-        flag = "KEV" if r["in_kev"] else "   "
-        desc = (r["description"] or "").replace("\n", " ")[:78]
-        print("  %5.1f  %-8s  %-18s %s  %s" % (r["score"] or 0, r["tier"] or "-", r["cve_id"], flag, desc))
+        marks = []
+        if r["in_kev"]:
+            marks.append("KEV")
+        if r["has_poc"]:
+            marks.append("PoC")
+        flag = ",".join(marks)
+        desc = (r["description"] or "").replace("\n", " ")[:70]
+        print("  %5.1f  %-8s  %-18s %-8s %s" % (r["score"] or 0, r["tier"] or "-", r["cve_id"], flag, desc))
     news = store.latest_news(8)
     if news:
         print("\n== Latest security news ==\n")

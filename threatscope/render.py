@@ -18,6 +18,8 @@ def build_dashboard(cves, news, stats):
             "cvss": c.get("cvss"),
             "epss": c.get("epss"),
             "kev": bool(c.get("in_kev")),
+            "poc": c.get("poc_count") or 0,
+            "poc_url": c.get("poc_url") or "",
             "desc": (c.get("description") or "")[:240],
             "ref": (c.get("refs") or "").split(" ")[0] if c.get("refs") else "",
         } for c in cves],
@@ -95,7 +97,7 @@ footer{padding:18px 24px;color:var(--mut);font-size:12px;border-top:1px solid va
   <table>
     <thead><tr>
       <th data-k="score">Score</th><th data-k="tier">Tier</th><th data-k="cve">CVE</th>
-      <th data-k="cvss">CVSS</th><th data-k="epss">EPSS</th><th>KEV</th><th>Description</th>
+      <th data-k="cvss">CVSS</th><th data-k="epss">EPSS</th><th>KEV</th><th data-k="poc">PoC</th><th>Description</th>
     </tr></thead>
     <tbody id="rows"></tbody>
   </table>
@@ -116,7 +118,7 @@ function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replac
 
 function cards(){
   const s=DATA.stats||{};
-  const d=[["Total CVEs",s.total_cves||0],["KEV (exploited)",s.kev||0],["Critical",s.critical||0],["News",s.news||0],["IOCs",s.iocs||0]];
+  const d=[["Total CVEs",s.total_cves||0],["KEV (exploited)",s.kev||0],["With PoC",s.with_poc||0],["Critical",s.critical||0],["News",s.news||0],["IOCs",s.iocs||0]];
   $("cards").innerHTML=d.map(x=>"<div class='card'><div class='n'>"+x[1]+"</div><div class='l'>"+x[0]+"</div></div>").join("");
 }
 function fmtEpss(v){return v==null?"-":(v*100).toFixed(1)+"%"}
@@ -137,12 +139,14 @@ function renderTable(){
   });
   $("rows").innerHTML=rows.map(function(r){
     const cve=r.ref?("<a href='"+esc(r.ref)+"' target='_blank' rel='noopener'>"+esc(r.cve)+"</a>"):esc(r.cve);
+    const poc=r.poc?(r.poc_url?("<a href='"+esc(r.poc_url)+"' target='_blank' rel='noopener'>"+r.poc+"</a>"):(""+r.poc)):"-";
     return "<tr><td class='score'>"+(r.score||0).toFixed(1)+"</td>"+
       "<td><span class='badge "+r.tier+"'>"+r.tier+"</span></td>"+
       "<td class='cve'>"+cve+"</td><td>"+fmtCvss(r.cvss)+"</td><td>"+fmtEpss(r.epss)+"</td>"+
       "<td>"+(r.kev?"<span class='kevyes'>YES</span>":"-")+"</td>"+
+      "<td>"+poc+"</td>"+
       "<td class='desc'>"+esc(r.desc)+"</td></tr>";
-  }).join("") || "<tr><td colspan='7' class='muted' style='padding:18px'>No matching CVEs. Run an update first.</td></tr>";
+  }).join("") || "<tr><td colspan='8' class='muted' style='padding:18px'>No matching CVEs. Run an update first.</td></tr>";
 }
 function news(){
   $("news").innerHTML=DATA.news.map(function(n){

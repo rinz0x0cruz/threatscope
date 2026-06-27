@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS cves (
     rationale TEXT,
     description TEXT,
     refs TEXT,
+    has_poc INTEGER DEFAULT 0,
+    poc_count INTEGER DEFAULT 0,
+    poc_url TEXT,
     source TEXT,
     first_seen TEXT,
     last_seen TEXT
@@ -62,6 +65,16 @@ class Store:
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self.conn.commit()
+        self._ensure_columns()
+
+    def _ensure_columns(self):
+        existing = {r["name"] for r in self.conn.execute("PRAGMA table_info(cves)")}
+        for col, ddl in (("has_poc", "INTEGER DEFAULT 0"),
+                         ("poc_count", "INTEGER DEFAULT 0"),
+                         ("poc_url", "TEXT")):
+            if col not in existing:
+                self.conn.execute("ALTER TABLE cves ADD COLUMN %s %s" % (col, ddl))
+        self.conn.commit()
 
     def close(self):
         self.conn.close()
@@ -79,18 +92,21 @@ class Store:
         self.conn.execute(
             """INSERT INTO cves
                (cve_id, published, modified, cvss, severity, epss, in_kev, kev_date_added,
-                score, tier, rationale, description, refs, source, first_seen, last_seen)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                score, tier, rationale, description, refs, has_poc, poc_count, poc_url,
+                source, first_seen, last_seen)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(cve_id) DO UPDATE SET
                  published=excluded.published, modified=excluded.modified, cvss=excluded.cvss,
                  severity=excluded.severity, epss=excluded.epss, in_kev=excluded.in_kev,
                  kev_date_added=excluded.kev_date_added, score=excluded.score, tier=excluded.tier,
                  rationale=excluded.rationale, description=excluded.description, refs=excluded.refs,
+                 has_poc=excluded.has_poc, poc_count=excluded.poc_count, poc_url=excluded.poc_url,
                  source=excluded.source, last_seen=excluded.last_seen""",
             (rec["cve_id"], rec.get("published"), rec.get("modified"), rec.get("cvss"),
              rec.get("severity"), rec.get("epss"), 1 if rec.get("in_kev") else 0,
              rec.get("kev_date_added"), rec.get("score"), rec.get("tier"), rec.get("rationale"),
-             rec.get("description"), rec.get("refs"), rec.get("source"), first_seen, ts),
+             rec.get("description"), rec.get("refs"), 1 if rec.get("has_poc") else 0,
+             rec.get("poc_count") or 0, rec.get("poc_url"), rec.get("source"), first_seen, ts),
         )
 
     def top_cves(self, limit=50):
@@ -138,6 +154,7 @@ class Store:
             "total_cves": q("SELECT COUNT(*) AS x FROM cves").fetchone()["x"],
             "kev": q("SELECT COUNT(*) AS x FROM cves WHERE in_kev=1").fetchone()["x"],
             "critical": q("SELECT COUNT(*) AS x FROM cves WHERE tier='Critical'").fetchone()["x"],
+            "with_poc": q("SELECT COUNT(*) AS x FROM cves WHERE has_poc=1").fetchone()["x"],
             "news": q("SELECT COUNT(*) AS x FROM news").fetchone()["x"],
             "iocs": q("SELECT COUNT(*) AS x FROM iocs").fetchone()["x"],
         }

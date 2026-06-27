@@ -18,10 +18,11 @@
       "enabled": false,
       "days": 1,
       "note": "abuse.ch requires a free Auth-Key. Set THREATFOX_AUTH_KEY and flip enabled to true."
-    }
+    },
+    "poc_github": { "enabled": true, "top_n_enrich": 50, "delay": 0.4 }
   },
   "scoring": {
-    "weights": { "cvss": 0.4, "epss": 0.4, "kev": 0.2 },
+    "weights": { "cvss": 0.35, "epss": 0.35, "kev": 0.2, "poc": 0.1 },
     "kev_floor": 80
   },
   "output": {

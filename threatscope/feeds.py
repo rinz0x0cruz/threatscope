@@ -285,3 +285,31 @@ def fetch_threatfox(days=1, auth_key=None):
             "source": "ThreatFox",
         })
     return out
+
+
+# ----------------------- Public PoC / exploit availability (poc-in-github) -----------------------
+POC_API = "https://poc-in-github.motikan2010.net/api/v1/"
+
+
+def fetch_pocs(cve_ids, delay=0.4):
+    """Return {cve_id: {count, url, stars}} for CVEs with public GitHub PoCs.
+
+    Uses the public poc-in-github index (no API key required). Query only the
+    CVEs you care about (e.g. the top prioritized set) to stay polite.
+    """
+    out = {}
+    for cid in cve_ids:
+        if not cid:
+            continue
+        try:
+            data = http.get_json(POC_API, params={"cve_id": cid}, timeout=30)
+        except Exception:
+            continue
+        pocs = data.get("pocs") or []
+        if pocs:
+            best = max(pocs, key=lambda p: int(p.get("stargazers_count") or 0))
+            out[cid] = {"count": len(pocs), "url": best.get("html_url"),
+                        "stars": int(best.get("stargazers_count") or 0)}
+        if delay:
+            time.sleep(delay)
+    return out
